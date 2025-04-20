@@ -1,0 +1,606 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../constants/app_theme.dart';
+import '../models/customer.dart';
+import '../models/maintenance.dart';
+import '../services/database_service.dart';
+import '../services/location_service.dart';
+import '../widgets/maintenance_bottom_sheet.dart';
+
+class CustomerDetailsScreen extends StatefulWidget {
+  final Customer customer;
+
+  const CustomerDetailsScreen({
+    super.key,
+    required this.customer,
+  });
+
+  @override
+  State<CustomerDetailsScreen> createState() => _CustomerDetailsScreenState();
+}
+
+class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> with SingleTickerProviderStateMixin {
+  final DatabaseService _databaseService = DatabaseService();
+  final LocationService _locationService = LocationService();
+  late TabController _tabController;
+  late Future<List<Maintenance>> _maintenancesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadMaintenances();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _loadMaintenances() {
+    _maintenancesFuture = _databaseService.getMaintenanceForCustomer(widget.customer.id!);
+  }
+  
+  void _showMaintenanceDetails(Maintenance maintenance) {
+    MaintenanceDetailsBottomSheet.show(
+      context: context,
+      customer: widget.customer,
+      maintenance: maintenance,
+      onMarkAsCompleted: _handleMarkAsCompleted,
+      onOpenMap: _openGoogleMaps,
+    );
+  }
+  
+  void _openGoogleMaps(String? locationCoords) async {
+    if (locationCoords == null || locationCoords.isEmpty) {
+      // Show a snackbar message if coordinates are not available
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location coordinates not available'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
+    try {
+      // Parse the coordinates
+      final parts = locationCoords.split(',');
+      if (parts.length == 2) {
+        final lat = double.parse(parts[0].trim());
+        final lng = double.parse(parts[1].trim());
+        
+        // Get the Google Maps URL from LocationService
+        final url = _locationService.getGoogleMapsUrl(lat, lng);
+        
+        // Launch the URL
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          // Show error if unable to launch URL
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open maps application'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Show error if coordinates format is invalid
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid location coordinates format'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error if any exception occurs
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error opening maps: $e'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+  
+  void _handleMarkAsCompleted(Maintenance maintenance) async {
+    setState(() {
+      _loadMaintenances();
+    });
+  }
+  
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    if (phoneNumber == 'N/A') return;
+    
+    final Uri launchUri = Uri(
+      scheme: 'tel',
+      path: phoneNumber,
+    );
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.customer.name),
+        backgroundColor: AppColors.primaryColor,
+        foregroundColor: Colors.white,
+      ),
+      body: Column(
+        children: [
+          _buildCustomerInfo(),
+          Expanded(
+            child: DefaultTabController(
+              length: 2,
+              child: Column(
+                children: [
+                  TabBar(
+                    labelColor: AppColors.primaryColor,
+                    unselectedLabelColor: AppColors.textSecondary,
+                    indicatorColor: AppColors.primaryColor,
+                    tabs: const [
+                      Tab(text: 'Details'),
+                      Tab(text: 'Maintenance History'),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildDetailsTab(),
+                        _buildMaintenanceTab(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerInfo() {
+    final address = '${widget.customer.address}, ${widget.customer.city}, ${widget.customer.state} - ${widget.customer.pinCode}';
+    
+    return Card(
+      margin: const EdgeInsets.all(16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.medium),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.customer.name,
+                    style: AppTextStyles.heading2,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.2),
+                    borderRadius: AppBorderRadius.small,
+                  ),
+                  child: Text(
+                    '${widget.customer.checkupInterval} Check-up',
+                    style: TextStyle(
+                      color: AppColors.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.location_on, size: 20, color: AppColors.primaryColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    address,
+                    style: AppTextStyles.bodyMedium,
+                  ),
+                ),
+                if (widget.customer.locationCoords != null && 
+                    widget.customer.locationCoords!.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.map, color: AppColors.accentColor),
+                    onPressed: () => _openGoogleMaps(widget.customer.locationCoords),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle('Contact Information'),
+          _buildContactItem('Owner', widget.customer.contactPersonOwner, widget.customer.mobile),
+          if (widget.customer.contactPersonProductionManager != null)
+            _buildContactItem(
+              'Production Manager', 
+              widget.customer.contactPersonProductionManager!, 
+              widget.customer.phone ?? 'N/A'
+            ),
+          if (widget.customer.contactPersonTechnicalManager != null)
+            _buildContactItem(
+              'Technical Manager', 
+              widget.customer.contactPersonTechnicalManager!, 
+              'N/A'
+            ),
+          if (widget.customer.email != null && widget.customer.email!.isNotEmpty)
+            _buildInfoRow(Icons.email, 'Email', widget.customer.email!),
+          const SizedBox(height: 24),
+          _buildSectionTitle('Address Information'),
+          _buildInfoRow(Icons.home, 'Address', widget.customer.address),
+          _buildInfoRow(Icons.location_city, 'City', widget.customer.city),
+          _buildInfoRow(Icons.map, 'State', widget.customer.state),
+          _buildInfoRow(Icons.pin_drop, 'Pin Code', widget.customer.pinCode),
+          const SizedBox(height: 24),
+          _buildSectionTitle('Maintenance Information'),
+          _buildInfoRow(
+            Icons.schedule, 
+            'Check-up Interval', 
+            widget.customer.checkupInterval
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMaintenanceTab() {
+    return FutureBuilder<List<Maintenance>>(
+      future: _maintenancesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading data: ${snapshot.error}',
+              style: AppTextStyles.bodyLarge,
+            ),
+          );
+        }
+        
+        final maintenances = snapshot.data ?? [];
+        
+        if (maintenances.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.engineering,
+                  size: 64,
+                  color: AppColors.textSecondary.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No maintenance records found',
+                  style: AppTextStyles.heading3.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    // Navigate to add new maintenance
+                    // Will be implemented later
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.medium),
+                  ),
+                  child: const Text('Add Maintenance Record'),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        // Sort maintenances by date (most recent first)
+        maintenances.sort((a, b) => b.nextMaintenanceDate.compareTo(a.nextMaintenanceDate));
+        
+        return _buildMaintenanceTimeline(maintenances);
+      },
+    );
+  }
+
+  Widget _buildMaintenanceTimeline(List<Maintenance> maintenances) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(maintenances.length, (index) {
+          final maintenance = maintenances[index];
+          final isLast = index == maintenances.length - 1;
+          
+          return _buildTimelineItem(
+            maintenance: maintenance,
+            isLast: isLast,
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildTimelineItem({
+    required Maintenance maintenance,
+    required bool isLast,
+  }) {
+    Color statusColor;
+    IconData statusIcon;
+    
+    switch (maintenance.status) {
+      case MaintenanceStatus.upcoming:
+        statusColor = AppColors.statusUpcoming;
+        statusIcon = Icons.pending;
+        break;
+      case MaintenanceStatus.completed:
+        statusColor = AppColors.statusCompleted;
+        statusIcon = Icons.check_circle;
+        break;
+      case MaintenanceStatus.overdue:
+        statusColor = AppColors.statusOverdue;
+        statusIcon = Icons.warning;
+        break;
+    }
+    
+    return InkWell(
+      onTap: () => _showMaintenanceDetails(maintenance),
+      borderRadius: AppBorderRadius.medium,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Timeline line and dot
+            SizedBox(
+              width: 24,
+              child: Column(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: statusColor, width: 2),
+                    ),
+                    child: Icon(
+                      statusIcon,
+                      size: 16,
+                      color: statusColor,
+                    ),
+                  ),
+                  if (!isLast)
+                    Container(
+                      width: 2,
+                      height: 50,
+                      color: Colors.grey.withOpacity(0.3),
+                      margin: const EdgeInsets.only(top: 4),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Content
+            Expanded(
+              child: Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.medium),
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            DateFormat('MMM dd, yyyy').format(maintenance.nextMaintenanceDate),
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 14,
+                                color: AppColors.primaryColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "Tap for details",
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (maintenance.notes != null && maintenance.notes!.isNotEmpty)
+                        Text(
+                          maintenance.notes!,
+                          style: AppTextStyles.bodyMedium,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      const SizedBox(height: 8),
+                      if (maintenance.status == MaintenanceStatus.completed)
+                        Text(
+                          "Completed: ${maintenance.completedDate != null ? DateFormat('MMM dd, yyyy').format(maintenance.completedDate!) : 'N/A'}",
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: AppTextStyles.heading3,
+      ),
+    );
+  }
+  
+  Widget _buildContactItem(String title, String name, String contact) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      color: AppColors.backgroundColor,
+      shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.small),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: AppColors.primaryColor,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.person,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  Text(
+                    name,
+                    style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  if (contact != 'N/A') Row(
+                    children: [
+                      const Icon(
+                        Icons.phone,
+                        size: 16,
+                        color: AppColors.accentColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        contact,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accentColor,
+                        ),
+                      ),
+                    ],
+                  ) else Row(
+                    children: [
+                      const Icon(
+                        Icons.phone,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        contact,
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.call, 
+                color: contact != 'N/A' ? AppColors.primaryColor : AppColors.textSecondary.withOpacity(0.5),
+              ),
+              onPressed: () => _makePhoneCall(contact),
+              tooltip: contact != 'N/A' ? 'Call $contact' : null,
+              disabledColor: AppColors.textSecondary.withOpacity(0.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppTextStyles.bodySmall,
+                ),
+                Text(
+                  value,
+                  style: AppTextStyles.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
