@@ -3,10 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_theme.dart';
 import '../models/customer.dart';
-import '../models/maintenance.dart';
+import '../models/machinery.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
-import '../widgets/maintenance_bottom_sheet.dart';
+import 'machinery_management_screen.dart';
 
 class CustomerDetailsScreen extends StatefulWidget {
   final Customer customer;
@@ -24,13 +24,13 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> with Sing
   final DatabaseService _databaseService = DatabaseService();
   final LocationService _locationService = LocationService();
   late TabController _tabController;
-  late Future<List<Maintenance>> _maintenancesFuture;
+  late Future<List<Machinery>> _machineryFuture;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadMaintenances();
+    _tabController = TabController(length: 2, vsync: this); // Updated to 2 tabs
+    _loadData();
   }
 
   @override
@@ -39,20 +39,18 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> with Sing
     super.dispose();
   }
 
+  void _loadData() {
+    _loadMaintenances();
+    _loadMachinery();
+  }
+
   void _loadMaintenances() {
-    _maintenancesFuture = _databaseService.getMaintenanceForCustomer(widget.customer.id!);
   }
-  
-  void _showMaintenanceDetails(Maintenance maintenance) {
-    MaintenanceDetailsBottomSheet.show(
-      context: context,
-      customer: widget.customer,
-      maintenance: maintenance,
-      onMarkAsCompleted: _handleMarkAsCompleted,
-      onOpenMap: _openGoogleMaps,
-    );
+
+  void _loadMachinery() {
+    _machineryFuture = _databaseService.getMachineryForCustomer(widget.customer.id!);
   }
-  
+    
   void _openGoogleMaps(String? locationCoords) async {
     if (locationCoords == null || locationCoords.isEmpty) {
       // Show a snackbar message if coordinates are not available
@@ -108,12 +106,18 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> with Sing
     }
   }
   
-  void _handleMarkAsCompleted(Maintenance maintenance) async {
-    setState(() {
-      _loadMaintenances();
-    });
+  void _navigateToMachineryManagement() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MachineryManagementScreen(
+          customer: widget.customer,
+        ),
+      ),
+    ).then((_) => setState(() {
+      _loadData();
+    }));
   }
-  
 
   Future<void> _makePhoneCall(String phoneNumber) async {
     if (phoneNumber == 'N/A') return;
@@ -140,7 +144,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> with Sing
           _buildCustomerInfo(),
           Expanded(
             child: DefaultTabController(
-              length: 2,
+              length: 2, // Updated to 2 tabs
               child: Column(
                 children: [
                   TabBar(
@@ -149,14 +153,14 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> with Sing
                     indicatorColor: AppColors.primaryColor,
                     tabs: const [
                       Tab(text: 'Details'),
-                      Tab(text: 'Maintenance History'),
+                      Tab(text: 'Machinery'),
                     ],
                   ),
                   Expanded(
                     child: TabBarView(
                       children: [
                         _buildDetailsTab(),
-                        _buildMaintenanceTab(),
+                        _buildMachineryTab(),
                       ],
                     ),
                   ),
@@ -181,32 +185,11 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> with Sing
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.customer.name,
-                    style: AppTextStyles.heading2,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryColor.withOpacity(0.2),
-                    borderRadius: AppBorderRadius.small,
-                  ),
-                  child: Text(
-                    '${widget.customer.checkupInterval} Check-up',
-                    style: TextStyle(
-                      color: AppColors.primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+            Text(
+              widget.customer.name,
+              style: AppTextStyles.heading2,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 12),
             Row(
@@ -262,20 +245,26 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> with Sing
           _buildInfoRow(Icons.map, 'State', widget.customer.state),
           _buildInfoRow(Icons.pin_drop, 'Pin Code', widget.customer.pinCode),
           const SizedBox(height: 24),
-          _buildSectionTitle('Maintenance Information'),
-          _buildInfoRow(
-            Icons.schedule, 
-            'Check-up Interval', 
-            widget.customer.checkupInterval
+          _buildSectionTitle('Machinery Information'),
+          ElevatedButton.icon(
+            onPressed: _navigateToMachineryManagement,
+            icon: const Icon(Icons.build),
+            label: const Text('Manage Machinery & Maintenance'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.medium),
+              minimumSize: const Size(double.maxFinite, 48),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMaintenanceTab() {
-    return FutureBuilder<List<Maintenance>>(
-      future: _maintenancesFuture,
+  Widget _buildMachineryTab() {
+    return FutureBuilder<List<Machinery>>(
+      future: _machineryFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -290,192 +279,109 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> with Sing
           );
         }
         
-        final maintenances = snapshot.data ?? [];
+        final machinery = snapshot.data ?? [];
         
-        if (maintenances.isEmpty) {
+        if (machinery.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.engineering,
+                  Icons.build_outlined,
                   size: 64,
                   color: AppColors.textSecondary.withOpacity(0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No maintenance records found',
+                  'No machinery found for this customer',
                   style: AppTextStyles.heading3.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () {
-                    // Navigate to add new maintenance
-                    // Will be implemented later
-                  },
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _navigateToMachineryManagement,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Machinery'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.medium),
                   ),
-                  child: const Text('Add Maintenance Record'),
                 ),
               ],
             ),
           );
         }
         
-        // Sort maintenances by date (most recent first)
-        maintenances.sort((a, b) => b.nextMaintenanceDate.compareTo(a.nextMaintenanceDate));
-        
-        return _buildMaintenanceTimeline(maintenances);
-      },
-    );
-  }
-
-  Widget _buildMaintenanceTimeline(List<Maintenance> maintenances) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: List.generate(maintenances.length, (index) {
-          final maintenance = maintenances[index];
-          final isLast = index == maintenances.length - 1;
-          
-          return _buildTimelineItem(
-            maintenance: maintenance,
-            isLast: isLast,
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildTimelineItem({
-    required Maintenance maintenance,
-    required bool isLast,
-  }) {
-    Color statusColor;
-    IconData statusIcon;
-    
-    switch (maintenance.status) {
-      case MaintenanceStatus.upcoming:
-        statusColor = AppColors.statusUpcoming;
-        statusIcon = Icons.pending;
-        break;
-      case MaintenanceStatus.completed:
-        statusColor = AppColors.statusCompleted;
-        statusIcon = Icons.check_circle;
-        break;
-      case MaintenanceStatus.overdue:
-        statusColor = AppColors.statusOverdue;
-        statusIcon = Icons.warning;
-        break;
-    }
-    
-    return InkWell(
-      onTap: () => _showMaintenanceDetails(maintenance),
-      borderRadius: AppBorderRadius.medium,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Timeline line and dot
-            SizedBox(
-              width: 24,
-              child: Column(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: statusColor, width: 2),
-                    ),
-                    child: Icon(
-                      statusIcon,
-                      size: 16,
-                      color: statusColor,
-                    ),
-                  ),
-                  if (!isLast)
-                    Container(
-                      width: 2,
-                      height: 50,
-                      color: Colors.grey.withOpacity(0.3),
-                      margin: const EdgeInsets.only(top: 4),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            // Content
-            Expanded(
-              child: Card(
-                elevation: 1,
-                shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.medium),
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            DateFormat('MMM dd, yyyy').format(maintenance.nextMaintenanceDate),
-                            style: AppTextStyles.bodyLarge.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.info_outline,
-                                size: 14,
-                                color: AppColors.primaryColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                "Tap for details",
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      if (maintenance.notes != null && maintenance.notes!.isNotEmpty)
-                        Text(
-                          maintenance.notes!,
-                          style: AppTextStyles.bodyMedium,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      const SizedBox(height: 8),
-                      if (maintenance.status == MaintenanceStatus.completed)
-                        Text(
-                          "Completed: ${maintenance.completedDate != null ? DateFormat('MMM dd, yyyy').format(maintenance.completedDate!) : 'N/A'}",
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                    ],
-                  ),
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: machinery.length,
+          itemBuilder: (context, index) {
+            final machine = machinery[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.medium),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: AppColors.primaryColor,
+                  child: Icon(Icons.precision_manufacturing, color: Colors.white),
                 ),
+                title: Text(
+                  machine.name,
+                  style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Serial: ${machine.serialNumber}'),
+                    Text(
+                      'Installed: ${DateFormat('MMM dd, yyyy').format(machine.installationDate)}',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                    Text(
+                      'Maintenance Interval: ${machine.checkupInterval} ${machine.checkupInterval == 1 ? 'month' : 'months'}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+                isThreeLine: true,
+                trailing: IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MachineryDetailScreen(
+                          machinery: machine,
+                          customer: widget.customer,
+                        ),
+                      ),
+                    ).then((_) => setState(() {
+                      _loadData();
+                    }));
+                  },
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MachineryDetailScreen(
+                        machinery: machine,
+                        customer: widget.customer,
+                      ),
+                    ),
+                  ).then((_) => setState(() {
+                    _loadData();
+                  }));
+                },
               ),
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 

@@ -7,6 +7,7 @@ import '../services/database_service.dart';
 import '../services/location_service.dart';
 import '../models/maintenance.dart';
 import '../models/customer.dart';
+import '../models/machinery.dart'; // Ensure Machinery is imported
 import '../widgets/maintenance_card.dart';
 import '../widgets/upcomming_bottom_sheet.dart';
 
@@ -39,12 +40,18 @@ class _HomeScreenState extends State<HomeScreen> {
     List<Map<String, dynamic>> result = [];
     
     for (var maintenance in maintenanceList) {
-      final customer = await _databaseService.getCustomer(maintenance.customerId);
-      if (customer != null) {
-        result.add({
-          'maintenance': maintenance,
-          'customer': customer,
-        });
+      // Get the machinery first since maintenance is now linked to machinery
+      final machinery = await _databaseService.getMachinery(maintenance.machineryId);
+      if (machinery != null) {
+        // Then get the customer associated with that machinery
+        final customer = await _databaseService.getCustomer(machinery.customerId);
+        if (customer != null) {
+          result.add({
+            'maintenance': maintenance,
+            'customer': customer,
+            'machinery': machinery,
+          });
+        }
       }
     }
     
@@ -230,13 +237,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showCustomerDetailsBottomSheet(Customer customer, Maintenance maintenance) {
-    UpcomingMaintenanceBottomSheet.show(
-      context: context,
-      customer: customer,
-      maintenance: maintenance,
-      onMarkAsCompleted: _showCompletionDialog,
-      onOpenMap: _openGoogleMaps,
-    );
+    // Get the machinery from the job item
+    final job = _todayMaintenanceFuture.then((jobs) {
+      return jobs.firstWhere(
+        (job) => 
+          (job['maintenance'] as Maintenance).id == maintenance.id &&
+          (job['customer'] as Customer).id == customer.id,
+        orElse: () => {'machinery': null}
+      );
+    });
+    
+    job.then((foundJob) {
+      UpcomingMaintenanceBottomSheet.show(
+        context: context,
+        customer: customer,
+        maintenance: maintenance,
+        machinery: foundJob['machinery'] as Machinery?,
+        onMarkAsCompleted: _showCompletionDialog,
+        onOpenMap: _openGoogleMaps,
+      );
+    });
   }
   
   
@@ -386,7 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: MaintenanceCard(
         customerName: customer.name,
         address: address,
-        maintenanceDate: maintenance.nextMaintenanceDate,
+        maintenanceDate: maintenance.nextMaintenanceDate ?? DateTime.now(),
         status: maintenance.status,
         maintenanceType: maintenance.maintenanceType,
         onTap: () {

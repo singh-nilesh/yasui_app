@@ -90,7 +90,7 @@ class _SplashScreenState extends State<SplashScreen> {
     
     // Seed sample data
     final dataSeeder = DataSeeder();
-    await dataSeeder.seedData();
+    await dataSeeder.seedDatabase();
     
     // Simulate loading time for demonstration
     await Future.delayed(const Duration(seconds: 2));

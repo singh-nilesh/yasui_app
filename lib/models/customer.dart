@@ -14,7 +14,6 @@ class Customer {
   final String mobile;
   final String? email;
   final String? locationCoords;
-  final String checkupInterval;
 
   Customer({
     this.id,
@@ -30,7 +29,6 @@ class Customer {
     required this.mobile,
     this.email,
     this.locationCoords,
-    required this.checkupInterval,
   });
 
   Map<String, dynamic> toMap() {
@@ -48,7 +46,6 @@ class Customer {
       'mobile': mobile,
       'email': email,
       'locationCoords': locationCoords,
-      'checkupInterval': checkupInterval,
     };
   }
 
@@ -67,7 +64,6 @@ class Customer {
       mobile: map['mobile'],
       email: map['email'],
       locationCoords: map['locationCoords'],
-      checkupInterval: map['checkupInterval'],
     );
   }
 
@@ -89,7 +85,6 @@ class Customer {
     String? mobile,
     String? email,
     String? locationCoords,
-    String? checkupInterval,
   }) {
     return Customer(
       id: id ?? this.id,
@@ -105,7 +100,6 @@ class Customer {
       mobile: mobile ?? this.mobile,
       email: email ?? this.email,
       locationCoords: locationCoords ?? this.locationCoords,
-      checkupInterval: checkupInterval ?? this.checkupInterval,
     );
   }
 }

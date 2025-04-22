@@ -4,22 +4,23 @@ enum MaintenanceStatus { upcoming, completed, overdue }
 
 class Maintenance {
   final int? id;
-  final int customerId;
-  final DateTime installationDate;
-  final DateTime nextMaintenanceDate;
-  final String maintenanceType; // "2-month" or "6-month"
+  final int machineryId;
+  final DateTime dueDate;
+  final DateTime? nextMaintenanceDate;
+  final String maintenanceType; // Type of maintenance being performed
   final MaintenanceStatus status;
   final String? notes;
   final DateTime? completedDate;
   final String? issue;      // Issue found during maintenance
   final String? fix;        // Fix applied during maintenance
   final double? cost;       // Cost of the maintenance/repair
+  final DateTime? createdAt;
 
   Maintenance({
     this.id,
-    required this.customerId,
-    required this.installationDate,
-    required this.nextMaintenanceDate,
+    required this.machineryId,
+    required this.dueDate,
+    this.nextMaintenanceDate,
     required this.maintenanceType,
     required this.status,
     this.notes,
@@ -27,14 +28,15 @@ class Maintenance {
     this.issue,
     this.fix,
     this.cost,
+    this.createdAt,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'customerId': customerId,
-      'installationDate': installationDate.millisecondsSinceEpoch,
-      'nextMaintenanceDate': nextMaintenanceDate.millisecondsSinceEpoch,
+      'machineryId': machineryId,
+      'dueDate': dueDate.millisecondsSinceEpoch,
+      'nextMaintenanceDate': nextMaintenanceDate?.millisecondsSinceEpoch,
       'maintenanceType': maintenanceType,
       'status': status.toString().split('.').last,
       'notes': notes,
@@ -42,15 +44,18 @@ class Maintenance {
       'issue': issue,
       'fix': fix,
       'cost': cost,
+      'createdAt': createdAt?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
     };
   }
 
   factory Maintenance.fromMap(Map<String, dynamic> map) {
     return Maintenance(
       id: map['id'],
-      customerId: map['customerId'],
-      installationDate: DateTime.fromMillisecondsSinceEpoch(map['installationDate']),
-      nextMaintenanceDate: DateTime.fromMillisecondsSinceEpoch(map['nextMaintenanceDate']),
+      machineryId: map['machineryId'],
+      dueDate: DateTime.fromMillisecondsSinceEpoch(map['dueDate']),
+      nextMaintenanceDate: map['nextMaintenanceDate'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['nextMaintenanceDate'])
+          : null,
       maintenanceType: map['maintenanceType'],
       status: MaintenanceStatus.values.firstWhere(
         (e) => e.toString().split('.').last == map['status'],
@@ -63,6 +68,9 @@ class Maintenance {
       issue: map['issue'],
       fix: map['fix'],
       cost: map['cost'],
+      createdAt: map['createdAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['createdAt'])
+          : null,
     );
   }
 
@@ -72,8 +80,8 @@ class Maintenance {
 
   Maintenance copyWith({
     int? id,
-    int? customerId,
-    DateTime? installationDate,
+    int? machineryId,
+    DateTime? dueDate,
     DateTime? nextMaintenanceDate,
     String? maintenanceType,
     MaintenanceStatus? status,
@@ -82,11 +90,12 @@ class Maintenance {
     String? issue,
     String? fix,
     double? cost,
+    DateTime? createdAt,
   }) {
     return Maintenance(
       id: id ?? this.id,
-      customerId: customerId ?? this.customerId,
-      installationDate: installationDate ?? this.installationDate,
+      machineryId: machineryId ?? this.machineryId,
+      dueDate: dueDate ?? this.dueDate,
       nextMaintenanceDate: nextMaintenanceDate ?? this.nextMaintenanceDate,
       maintenanceType: maintenanceType ?? this.maintenanceType,
       status: status ?? this.status,
@@ -95,6 +104,7 @@ class Maintenance {
       issue: issue ?? this.issue,
       fix: fix ?? this.fix,
       cost: cost ?? this.cost,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

@@ -119,23 +119,12 @@ class MaintenanceDetailsBottomSheet extends StatelessWidget {
                           value: maintenance.maintenanceType,
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildDetailRow(
-                                icon: Icons.history,
-                                label: 'Installed:',
-                                value: _formatDate(maintenance.installationDate),
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildDetailRow(
-                                icon: Icons.event,
-                                label: 'Next:',
-                                value: _formatDate(maintenance.nextMaintenanceDate),
-                              ),
-                            ),
-                          ],
+                        _buildDetailRow(
+                          icon: Icons.event,
+                          label: 'Next:',
+                          value: maintenance.nextMaintenanceDate != null
+                              ? _formatDate(maintenance.nextMaintenanceDate!)
+                              : 'Not scheduled',
                         ),
                         if (maintenance.notes != null && maintenance.notes!.isNotEmpty) ...[
                           const SizedBox(height: 8),
@@ -226,49 +215,55 @@ class MaintenanceDetailsBottomSheet extends StatelessWidget {
                 // Action Button (for marking as completed)
                 const SizedBox(height: 16),
                 if (maintenance.status != MaintenanceStatus.completed)
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      onMarkAsCompleted(maintenance);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onMarkAsCompleted(maintenance);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'Mark as Completed',
-                      style: AppTextStyles.buttonText,
+                      child: const Text(
+                        'Mark as Completed',
+                        style: AppTextStyles.buttonText,
+                      ),
                     ),
                   )
                 else
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.statusCompleted.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.statusCompleted),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.check_circle_outline,
-                          color: AppColors.statusCompleted,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Maintenance Completed',
-                          style: AppTextStyles.bodyMedium.copyWith(
+                  SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.statusCompleted.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.statusCompleted),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_outline,
                             color: AppColors.statusCompleted,
-                            fontWeight: FontWeight.bold,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Text(
+                            'Maintenance Completed',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.statusCompleted,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
               ],
@@ -319,7 +314,7 @@ class MaintenanceDetailsBottomSheet extends StatelessWidget {
                   text: TextSpan(
                     children: [
                       TextSpan(
-                        text: label + ' ',
+                        text: '$label ',
                         style: AppTextStyles.bodyMedium.copyWith(
                           fontWeight: FontWeight.w500,
                         ),

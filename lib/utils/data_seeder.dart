@@ -1,34 +1,57 @@
-import '../models/customer.dart';
-import '../models/maintenance.dart';
-import '../services/database_service.dart';
+import 'package:yasui_app/models/customer.dart';
+import 'package:yasui_app/models/machinery.dart';
+import 'package:yasui_app/models/maintenance.dart';
+import 'package:yasui_app/services/database_service.dart';
 
 class DataSeeder {
   final DatabaseService _databaseService = DatabaseService();
-  
-  Future<void> seedData() async {
-    // Check if data already exists
+
+  Future<void> seedDatabase() async {
     final customers = await _databaseService.getCustomers();
-    if (customers.isNotEmpty) {
-      return; // Database already has data
-    }
     
-    // Seed sample customers
-    final List<Customer> sampleCustomers = _createSampleCustomers();
-    List<int> customerIds = [];
-    
-    for (var customer in sampleCustomers) {
-      final id = await _databaseService.insertCustomer(customer);
-      customerIds.add(id);
-    }
-    
-    // Seed sample maintenance records
-    final sampleMaintenances = _createSampleMaintenances(customerIds);
-    
-    for (var maintenance in sampleMaintenances) {
-      await _databaseService.insertMaintenance(maintenance);
+    // Only seed if database is empty
+    if (customers.isEmpty) {
+      print('Seeding database with initial data...');
+      
+      // Insert sample customers
+      final sampleCustomers = _createSampleCustomers();
+      final customerIds = <int>[];
+      
+      for (var customer in sampleCustomers) {
+        final id = await _databaseService.insertCustomer(customer);
+        customerIds.add(id);
+        print('Created customer: ${customer.name} with ID: $id');
+      }
+      
+      // Insert sample machinery for each customer
+      final machineryIds = <int>[];
+      for (int i = 0; i < customerIds.length; i++) {
+        final customerId = customerIds[i];
+        final machineries = _createSampleMachineryForCustomer(customerId);
+        
+        for (var machinery in machineries) {
+          final id = await _databaseService.insertMachinery(machinery);
+          machineryIds.add(id);
+          print('Created machinery: ${machinery.name} for customer ID: $customerId');
+        }
+      }
+      
+      // Insert sample maintenance records for each machinery
+      for (int machineryId in machineryIds) {
+        final maintenances = _createSampleMaintenanceForMachinery(machineryId);
+        
+        for (var maintenance in maintenances) {
+          final id = await _databaseService.insertMaintenance(maintenance);
+          print('Created maintenance record with ID: $id for machinery ID: $machineryId');
+        }
+      }
+      
+      print('Database seeding completed successfully!');
+    } else {
+      print('Database already has data. Skipping seed operation.');
     }
   }
-  
+
   List<Customer> _createSampleCustomers() {
     return [
       Customer(
@@ -44,7 +67,6 @@ class DataSeeder {
         mobile: '9876543210',
         email: 'info@abcindustries.com',
         locationCoords: '19.076090,72.877426',
-        checkupInterval: '2-month',
       ),
       Customer(
         name: 'XYZ Manufacturing',
@@ -59,7 +81,6 @@ class DataSeeder {
         mobile: '8765432109',
         email: 'contact@xyzmanufacturing.com',
         locationCoords: '18.520430,73.856743',
-        checkupInterval: '6-month',
       ),
       Customer(
         name: 'Sunshine Textiles',
@@ -74,7 +95,6 @@ class DataSeeder {
         mobile: '7654321098',
         email: 'info@sunshinetextiles.in',
         locationCoords: '23.022505,72.571365',
-        checkupInterval: '2-month',
       ),
       Customer(
         name: 'Global Electronics',
@@ -89,7 +109,6 @@ class DataSeeder {
         mobile: '9876123450',
         email: 'contact@globalelectronics.com',
         locationCoords: '12.971599,77.594563',
-        checkupInterval: '6-month',
       ),
       Customer(
         name: 'Eastern Chemicals',
@@ -104,114 +123,85 @@ class DataSeeder {
         mobile: '8765123490',
         email: 'info@easternchemicals.com',
         locationCoords: '22.572646,88.363895',
-        checkupInterval: '2-month',
       ),
     ];
   }
-  
-  List<Maintenance> _createSampleMaintenances(List<int> customerIds) {
+
+  List<Machinery> _createSampleMachineryForCustomer(int customerId) {
     final today = DateTime.now();
-    final List<Maintenance> maintenances = [];
     
-    // Today's maintenance for first customer
-    maintenances.add(
-      Maintenance(
-        customerId: customerIds[0],
+    // Create 2 machinery items per customer with different installation dates and checkup intervals
+    return [
+      Machinery(
+        customerId: customerId,
+        name: 'Production Line ${customerId}A',
+        serialNumber: 'SN-${customerId}001',
         installationDate: DateTime(today.year - 1, today.month, today.day),
-        nextMaintenanceDate: today,
-        maintenanceType: '2-month',
-        status: MaintenanceStatus.upcoming,
-        notes: 'Regular bi-monthly maintenance check.',
+        installationCost: 250000 + (customerId * 10000),
+        checkupInterval: customerId % 2 == 0 ? 3 : 2,
       ),
-    );
-    
-    // Today's maintenance for third customer
-    maintenances.add(
-      Maintenance(
-        customerId: customerIds[2],
-        installationDate: DateTime(today.year - 1, today.month - 6, today.day + 5),
-        nextMaintenanceDate: today,
-        maintenanceType: '2-month',
-        status: MaintenanceStatus.upcoming,
-        notes: 'Check textile machinery for calibration.',
+      Machinery(
+        customerId: customerId,
+        name: 'Auxiliary System ${customerId}B',
+        serialNumber: 'SN-${customerId}002',
+        installationDate: DateTime(today.year - 2, today.month + 2, today.day - 5),
+        installationCost: 120000 + (customerId * 5000),
+        checkupInterval: customerId % 2 == 0 ? 6 : 3,
       ),
-    );
+    ];
+  }
+
+  List<Maintenance> _createSampleMaintenanceForMachinery(int machineryId) {
+    final today = DateTime.now();
     
-    // Upcoming maintenance for second customer
-    maintenances.add(
+    // Create several maintenance records for each machinery with different statuses
+    return [
+      // Completed maintenance (in the past)
       Maintenance(
-        customerId: customerIds[1],
-        installationDate: DateTime(today.year - 2, today.month, today.day),
-        nextMaintenanceDate: today.add(const Duration(days: 15)),
-        maintenanceType: '6-month',
-        status: MaintenanceStatus.upcoming,
-        notes: 'Semi-annual comprehensive maintenance.',
-      ),
-    );
-    
-    // Upcoming maintenance for fourth customer
-    maintenances.add(
-      Maintenance(
-        customerId: customerIds[3],
-        installationDate: DateTime(today.year - 1, today.month - 2, today.day),
-        nextMaintenanceDate: today.add(const Duration(days: 7)),
-        maintenanceType: '6-month',
-        status: MaintenanceStatus.upcoming,
-        notes: 'Check all electronic equipment and update firmware if necessary.',
-      ),
-    );
-    
-    // Overdue maintenance for fifth customer
-    maintenances.add(
-      Maintenance(
-        customerId: customerIds[4],
-        installationDate: DateTime(today.year - 1, today.month - 8, today.day),
-        nextMaintenanceDate: today.subtract(const Duration(days: 5)),
-        maintenanceType: '2-month',
-        status: MaintenanceStatus.overdue,
-        notes: 'Critical safety check for chemical processing equipment.',
-      ),
-    );
-    
-    // Additional future maintenance for first customer
-    maintenances.add(
-      Maintenance(
-        customerId: customerIds[0],
-        installationDate: DateTime(today.year - 1, today.month, today.day),
-        nextMaintenanceDate: today.add(const Duration(days: 60)),
-        maintenanceType: '2-month',
-        status: MaintenanceStatus.upcoming,
-        notes: 'Follow-up to today\'s maintenance.',
-      ),
-    );
-    
-    // Completed maintenance for second customer
-    maintenances.add(
-      Maintenance(
-        customerId: customerIds[1],
-        installationDate: DateTime(today.year - 2, today.month - 6, today.day),
-        nextMaintenanceDate: today.subtract(const Duration(days: 30)),
-        maintenanceType: '6-month',
+        machineryId: machineryId,
+        dueDate: DateTime(today.year, today.month - 2, today.day),
+        nextMaintenanceDate: null,
+        maintenanceType: 'Regular',
         status: MaintenanceStatus.completed,
-        completedDate: today.subtract(const Duration(days: 28)),
-        notes: 'All systems working properly after maintenance.',
+        notes: 'Routine maintenance check completed on schedule.',
+        completedDate: DateTime(today.year, today.month - 2, today.day + 1),
+        issue: machineryId % 3 == 0 ? 'Minor calibration issues detected' : null,
+        fix: machineryId % 3 == 0 ? 'Recalibrated and tested' : 'No issues found, regular maintenance performed',
+        cost: machineryId % 3 == 0 ? 2500.0 : 1200.0,
       ),
-    );
-    
-    // More future maintenance records
-    for (int i = 0; i < customerIds.length; i++) {
-      maintenances.add(
+      
+      // Current/upcoming maintenance (due today or in near future)
+      Maintenance(
+        machineryId: machineryId,
+        dueDate: DateTime(today.year, today.month, today.day + (machineryId % 5)),
+        nextMaintenanceDate: null,
+        maintenanceType: machineryId % 2 == 0 ? 'Regular' : 'Inspection',
+        status: MaintenanceStatus.upcoming,
+        notes: 'Scheduled maintenance check for ${machineryId % 2 == 0 ? 'regular servicing' : 'detailed inspection'}.',
+      ),
+      
+      // Overdue maintenance (if machinery ID is odd)
+      if (machineryId % 2 != 0)
         Maintenance(
-          customerId: customerIds[i],
-          installationDate: DateTime(today.year - 1, today.month, today.day - i),
-          nextMaintenanceDate: today.add(Duration(days: 90 + (i * 15))),
-          maintenanceType: i % 2 == 0 ? '2-month' : '6-month',
-          status: MaintenanceStatus.upcoming,
-          notes: 'Scheduled regular maintenance.',
+          machineryId: machineryId,
+          dueDate: DateTime(today.year, today.month, today.day - 10),
+          nextMaintenanceDate: null,
+          maintenanceType: 'Emergency',
+          status: MaintenanceStatus.overdue,
+          notes: 'Urgent maintenance required based on performance metrics.',
         ),
-      );
-    }
-    
-    return maintenances;
+      
+      // Future scheduled maintenance
+      Maintenance(
+        machineryId: machineryId,
+        dueDate: DateTime(today.year, today.month + 2, today.day),
+        nextMaintenanceDate: null,
+        maintenanceType: machineryId % 3 == 0 ? 'Upgrade' : 'Regular',
+        status: MaintenanceStatus.upcoming,
+        notes: machineryId % 3 == 0 
+            ? 'Scheduled firmware and component upgrade.' 
+            : 'Regular maintenance as per schedule.',
+      ),
+    ];
   }
 }

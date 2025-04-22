@@ -3,6 +3,7 @@ import '../constants/app_theme.dart';
 import 'home_screen.dart';
 import 'calendar_screen.dart';
 import 'customer_list_screen.dart';
+import 'db_inspector_screen.dart';
 
 class BottomTabContainer extends StatefulWidget {
   const BottomTabContainer({super.key});
@@ -18,6 +19,7 @@ class _BottomTabContainerState extends State<BottomTabContainer> {
     HomeScreen(),
     CalendarScreen(),
     CustomerListScreen(),
+    DbInspectorScreen(),
   ];
     
   void _onItemTapped(int index) {
@@ -53,6 +55,11 @@ class _BottomTabContainerState extends State<BottomTabContainer> {
             icon: Icon(Icons.people_outline),
             activeIcon: Icon(Icons.people),
             label: 'Customers',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.storage_outlined),
+            activeIcon: Icon(Icons.storage),
+            label: 'DB Inspector',
           ),
         ],
       ),

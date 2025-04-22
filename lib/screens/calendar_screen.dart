@@ -7,8 +7,7 @@ import '../services/database_service.dart';
 import '../services/location_service.dart';
 import '../models/maintenance.dart';
 import '../models/customer.dart';
-import '../widgets/maintenance_card.dart';
-import '../widgets/upcomming_bottom_sheet.dart';
+import '../models/machinery.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -30,7 +29,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.initState();
     _loadEvents();
     _loadMaintenanceForSelectedDay();
-    // Always use month format
   }
 
   Future<void> _loadEvents() async {
@@ -41,25 +39,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _loadMaintenanceForSelectedDay() {
-    _maintenanceFuture = _getMaintenanceWithCustomerInfo(_selectedDay);
-  }
-
-  Future<List<Map<String, dynamic>>> _getMaintenanceWithCustomerInfo(DateTime date) async {
-    final maintenanceList = await _databaseService.getMaintenanceByDate(date);
-    
-    List<Map<String, dynamic>> result = [];
-    
-    for (var maintenance in maintenanceList) {
-      final customer = await _databaseService.getCustomer(maintenance.customerId);
-      if (customer != null) {
-        result.add({
-          'maintenance': maintenance,
-          'customer': customer,
-        });
-      }
-    }
-    
-    return result;
+    _maintenanceFuture = _databaseService.getMaintenanceDetailsForDate(_selectedDay);
   }
 
   void _openGoogleMaps(String? locationCoords) async {
@@ -592,25 +572,392 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget _buildMaintenanceItem(Map<String, dynamic> job) {
     final maintenance = job['maintenance'] as Maintenance;
     final customer = job['customer'] as Customer;
+    final machinery = job['machinery'] as Machinery;
     
     final address = '${customer.address}, ${customer.city}, ${customer.state} - ${customer.pinCode}';
     
-    return MaintenanceCard(
-      customerName: customer.name,
-      address: address,
-      maintenanceDate: maintenance.nextMaintenanceDate,
-      status: maintenance.status,
-      maintenanceType: maintenance.maintenanceType,
-      onTap: () {
-        // Show the maintenance details bottom sheet
-        UpcomingMaintenanceBottomSheet.show(
-          context: context,
-          customer: customer,
-          maintenance: maintenance,
-          onMarkAsCompleted: _showCompletionDialog,
-          onOpenMap: _openGoogleMaps,
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: InkWell(
+        onTap: () => _showMaintenanceDetails(job),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(maintenance.status).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _getStatusIcon(maintenance.status),
+                      color: _getStatusColor(maintenance.status),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          customer.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          machinery.name,
+                          style: TextStyle(
+                            color: AppColors.primaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          'S/N: ${machinery.serialNumber}',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(maintenance.status).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          maintenance.status.toString().split('.').last,
+                          style: TextStyle(
+                            color: _getStatusColor(maintenance.status),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        DateFormat('MMM d, yyyy').format(maintenance.dueDate),
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Divider(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      address,
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 12,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              // Removed the buttons row with View Machine and Complete options
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMaintenanceDetails(Map<String, dynamic> job) {
+    final maintenance = job['maintenance'] as Maintenance;
+    final customer = job['customer'] as Customer;
+    final machinery = job['machinery'] as Machinery;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Maintenance Details',
+                      style: AppTextStyles.heading3,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      if (customer.locationCoords != null && customer.locationCoords!.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.map, color: AppColors.accentColor),
+                          onPressed: () => _openGoogleMaps(customer.locationCoords),
+                          tooltip: 'Open in Maps',
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Divider(),
+              // Customer & Machine info
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.business, color: AppColors.primaryColor),
+                          const SizedBox(width: 8),
+                          Text(
+                            customer.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Address section added here
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.location_on, color: AppColors.accentColor, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Address:',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  customer.address,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                Text(
+                                  '${customer.city}, ${customer.state} - ${customer.pinCode}',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.build, color: AppColors.accentColor, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  machinery.name,
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                Text(
+                                  'Serial: ${machinery.serialNumber}',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  'Maintenance Interval: ${machinery.checkupInterval} ${machinery.checkupInterval == 1 ? 'month' : 'months'}',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Maintenance Details
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDetailRow(
+                        Icons.event,
+                        'Due Date',
+                        DateFormat('MMMM d, yyyy').format(maintenance.dueDate),
+                      ),
+                      _buildDetailRow(
+                        _getStatusIcon(maintenance.status),
+                        'Status',
+                        maintenance.status.toString().split('.').last,
+                        valueColor: _getStatusColor(maintenance.status),
+                      ),
+                      _buildDetailRow(
+                        Icons.category,
+                        'Type',
+                        maintenance.maintenanceType,
+                      ),
+                      if (maintenance.notes != null && maintenance.notes!.isNotEmpty)
+                        _buildDetailRow(
+                          Icons.note,
+                          'Notes',
+                          maintenance.notes!,
+                        ),
+                      if (maintenance.completedDate != null)
+                        _buildDetailRow(
+                          Icons.check_circle,
+                          'Completed On',
+                          DateFormat('MMMM d, yyyy').format(maintenance.completedDate!),
+                        ),
+                      if (maintenance.issue != null && maintenance.issue!.isNotEmpty)
+                        _buildDetailRow(
+                          Icons.warning,
+                          'Issues Found',
+                          maintenance.issue!,
+                        ),
+                      if (maintenance.fix != null && maintenance.fix!.isNotEmpty)
+                        _buildDetailRow(
+                          Icons.build,
+                          'Fix Applied',
+                          maintenance.fix!,
+                        ),
+                      if (maintenance.cost != null)
+                        _buildDetailRow(
+                          Icons.attach_money,
+                          'Cost',
+                          '₹${maintenance.cost!.toStringAsFixed(2)}',
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (maintenance.status != MaintenanceStatus.completed)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text('Mark as Completed'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showCompletionDialog(maintenance);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.statusCompleted,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: valueColor ?? AppColors.textPrimary,
+                    fontWeight: valueColor != null ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getStatusColor(MaintenanceStatus status) {
+    switch (status) {
+      case MaintenanceStatus.upcoming:
+        return AppColors.statusUpcoming;
+      case MaintenanceStatus.completed:
+        return AppColors.statusCompleted;
+      case MaintenanceStatus.overdue:
+        return AppColors.statusOverdue;
+    }
+  }
+
+  IconData _getStatusIcon(MaintenanceStatus status) {
+    switch (status) {
+      case MaintenanceStatus.upcoming:
+        return Icons.pending;
+      case MaintenanceStatus.completed:
+        return Icons.check_circle;
+      case MaintenanceStatus.overdue:
+        return Icons.warning;
+    }
   }
 }

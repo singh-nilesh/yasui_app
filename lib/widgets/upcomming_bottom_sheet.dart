@@ -1,13 +1,16 @@
 // This file contains the implementation for upcoming maintenance bottom sheet
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_theme.dart';
 import '../models/customer.dart';
+import '../models/machinery.dart';
 import '../models/maintenance.dart';
 
 class UpcomingMaintenanceBottomSheet extends StatelessWidget {
   final Customer customer;
   final Maintenance maintenance;
+  final Machinery? machinery;
   final Function(Maintenance) onMarkAsCompleted;
   final Function(String?) onOpenMap;
 
@@ -15,6 +18,7 @@ class UpcomingMaintenanceBottomSheet extends StatelessWidget {
     super.key,
     required this.customer,
     required this.maintenance,
+    this.machinery,
     required this.onMarkAsCompleted,
     required this.onOpenMap,
   });
@@ -130,6 +134,80 @@ class UpcomingMaintenanceBottomSheet extends StatelessWidget {
                     customer.contactPersonTechnicalManager!,
                     '',
                   ),
+                
+                // Machinery Details Section
+                if (machinery != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Machinery Details',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.precision_manufacturing,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          machinery!.name,
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.qr_code,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'S/N: ${machinery!.serialNumber}',
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.history,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Installation Date: ${DateFormat('dd/MM/yyyy').format(machinery!.installationDate)}',
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.update,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Maintenance Interval: ${machinery!.checkupInterval} ${machinery!.checkupInterval == 1 ? 'month' : 'months'}',
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ],
+
                 const SizedBox(height: 16),
                 Text(
                   'Maintenance Details',
@@ -162,22 +240,7 @@ class UpcomingMaintenanceBottomSheet extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Next Maintenance: ${_formatDate(maintenance.nextMaintenanceDate)}',
-                      style: AppTextStyles.bodyMedium,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.history,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Installation Date: ${_formatDate(maintenance.installationDate)}',
+                      'Due Date: ${DateFormat('dd/MM/yyyy').format(maintenance.dueDate)}',
                       style: AppTextStyles.bodyMedium,
                     ),
                   ],
@@ -224,7 +287,7 @@ class UpcomingMaintenanceBottomSheet extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Completed On: ${_formatDate(maintenance.completedDate!)}',
+                          'Completed On: ${DateFormat('dd/MM/yyyy').format(maintenance.completedDate!)}',
                           style: AppTextStyles.bodyMedium,
                         ),
                       ],
@@ -401,16 +464,13 @@ class UpcomingMaintenanceBottomSheet extends StatelessWidget {
       ),
     );
   }
-  
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
 
   // Helper method to show the bottom sheet
   static void show({
     required BuildContext context, 
     required Customer customer, 
     required Maintenance maintenance,
+    Machinery? machinery,
     required Function(Maintenance) onMarkAsCompleted,
     required Function(String?) onOpenMap,
   }) {
@@ -427,6 +487,7 @@ class UpcomingMaintenanceBottomSheet extends StatelessWidget {
         return UpcomingMaintenanceBottomSheet(
           customer: customer,
           maintenance: maintenance,
+          machinery: machinery,
           onMarkAsCompleted: onMarkAsCompleted,
           onOpenMap: onOpenMap,
         );
