@@ -24,7 +24,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'yasui_app.db');
     return await openDatabase(
       path,
-      version: 3, // Incrementing version to handle schema update
+      version: 4, // Incrementing version to handle schema update
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -171,6 +171,11 @@ class DatabaseService {
       await db.execute('DROP TABLE customers_backup');
       await db.execute('DROP TABLE maintenance_backup');
     }
+    
+    if (oldVersion < 4) {
+      // Add isDeleted column to machinery table
+      await db.execute('ALTER TABLE machinery ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   Future<void> _createDatabase(Database db, int version) async {
@@ -201,6 +206,7 @@ class DatabaseService {
         installationDate INTEGER NOT NULL,
         installationCost REAL,
         checkupInterval INTEGER NOT NULL,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (customerId) REFERENCES customers (id) ON DELETE CASCADE
       )
     ''');
@@ -278,7 +284,7 @@ class DatabaseService {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'machinery',
-      where: 'customerId = ?',
+      where: 'customerId = ? AND isDeleted = 0',
       whereArgs: [customerId],
     );
     return List.generate(maps.length, (i) => Machinery.fromMap(maps[i]));
@@ -313,13 +319,28 @@ class DatabaseService {
     );
   }
 
-  Future<int> deleteMachinery(int id) async {
+  Future<int> markMachineryAsDeleted(int id) async {
     final db = await database;
-    return await db.delete(
+    
+    // Delete upcoming maintenance records for this machinery
+    await db.delete(
+      'maintenance',
+      where: 'machineryId = ? AND status = ?',
+      whereArgs: [id, 'upcoming'],
+    );
+    
+    // Update the machinery to mark it as deleted instead of actually deleting it
+    return await db.update(
       'machinery',
+      {'isDeleted': 1},
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // Keep the original method for compatibility, but now it calls markMachineryAsDeleted
+  Future<int> deleteMachinery(int id) async {
+    return await markMachineryAsDeleted(id);
   }
 
   // Maintenance CRUD operations

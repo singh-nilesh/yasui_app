@@ -418,7 +418,7 @@ class _MachineryManagementScreenState extends State<MachineryManagementScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Confirm Deletion'),
         content: Text(
-          'Are you sure you want to delete ${machinery.name}? This will also delete all maintenance records associated with this machinery.',
+          'Are you sure you want to delete ${machinery.name}? It will be marked as deleted and won\'t appear in listings. All upcoming maintenance records will be removed, but historical maintenance data will be preserved.',
         ),
         actions: [
           TextButton(
@@ -430,7 +430,7 @@ class _MachineryManagementScreenState extends State<MachineryManagementScreen> {
               foregroundColor: Colors.red,
             ),
             onPressed: () async {
-              await _databaseService.deleteMachinery(machinery.id!);
+              await _databaseService.markMachineryAsDeleted(machinery.id!);
               Navigator.of(context).pop();
               _loadMachinery();
             },
@@ -497,39 +497,50 @@ class _MachineryDetailScreenState extends State<MachineryDetailScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                _buildMachineryInfoCard(),
-                const Divider(),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Maintenance History',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+          : RefreshIndicator(
+              onRefresh: _loadMaintenanceRecords,
+              child: ListView(
+                children: [
+                  // Machinery info card (now scrollable with the rest of the content)
+                  _buildMachineryInfoCard(),
+                  const Divider(),
+                  
+                  // Header section with title and button
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Maintenance History',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.add),
-                        label: const Text('Schedule'),
-                        onPressed: () => _showScheduleMaintenanceDialog(context),
-                      ),
-                    ],
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.add),
+                          label: const Text('Schedule'),
+                          onPressed: () => _showScheduleMaintenanceDialog(context),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: _maintenanceRecords.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No maintenance records found',
-                            style: TextStyle(fontSize: 16),
+                  
+                  // Maintenance records list
+                  _maintenanceRecords.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Center(
+                            child: Text(
+                              'No maintenance records found',
+                              style: TextStyle(fontSize: 16),
+                            ),
                           ),
                         )
                       : ListView.builder(
+                          shrinkWrap: true, // Important to work inside another ListView
+                          physics: const NeverScrollableScrollPhysics(), // Disable scrolling of this inner ListView
                           itemCount: _maintenanceRecords.length,
                           itemBuilder: (context, index) {
                             final record = _maintenanceRecords[index];
@@ -581,8 +592,10 @@ class _MachineryDetailScreenState extends State<MachineryDetailScreen> {
                             );
                           },
                         ),
-                ),
-              ],
+                  // Add some padding at the bottom
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
     );
   }

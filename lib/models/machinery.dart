@@ -8,6 +8,7 @@ class Machinery {
   final DateTime installationDate;
   final double? installationCost;
   final int checkupInterval; // in months
+  final bool isDeleted; // Flag to mark machinery as deleted
 
   Machinery({
     this.id,
@@ -17,6 +18,7 @@ class Machinery {
     required this.installationDate,
     this.installationCost,
     required this.checkupInterval,
+    this.isDeleted = false, // Default to false
   });
 
   Map<String, dynamic> toMap() {
@@ -28,6 +30,7 @@ class Machinery {
       'installationDate': installationDate.millisecondsSinceEpoch,
       'installationCost': installationCost,
       'checkupInterval': checkupInterval,
+      'isDeleted': isDeleted ? 1 : 0, // SQLite doesn't have boolean, use int
     };
   }
 
@@ -40,6 +43,7 @@ class Machinery {
       installationDate: DateTime.fromMillisecondsSinceEpoch(map['installationDate']),
       installationCost: map['installationCost'],
       checkupInterval: map['checkupInterval'],
+      isDeleted: map['isDeleted'] == 1, // Convert from integer to boolean
     );
   }
 
@@ -55,6 +59,7 @@ class Machinery {
     DateTime? installationDate,
     double? installationCost,
     int? checkupInterval,
+    bool? isDeleted,
   }) {
     return Machinery(
       id: id ?? this.id,
@@ -64,6 +69,7 @@ class Machinery {
       installationDate: installationDate ?? this.installationDate,
       installationCost: installationCost ?? this.installationCost,
       checkupInterval: checkupInterval ?? this.checkupInterval,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }
