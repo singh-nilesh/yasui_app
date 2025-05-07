@@ -96,39 +96,12 @@ class DataSeeder {
         email: 'info@sunshinetextiles.in',
         locationCoords: '23.022505,72.571365',
       ),
-      Customer(
-        name: 'Global Electronics',
-        contactPersonOwner: 'Priya Sharma',
-        contactPersonProductionManager: null,
-        contactPersonTechnicalManager: 'Ajay Verma',
-        address: '234 Tech Park',
-        pinCode: '560001',
-        city: 'Bangalore',
-        state: 'Karnataka',
-        phone: '080-23456789',
-        mobile: '9876123450',
-        email: 'contact@globalelectronics.com',
-        locationCoords: '12.971599,77.594563',
-      ),
-      Customer(
-        name: 'Eastern Chemicals',
-        contactPersonOwner: 'Arun Gupta',
-        contactPersonProductionManager: 'Sanjay Mishra',
-        contactPersonTechnicalManager: null,
-        address: '567 Chemical Zone',
-        pinCode: '700001',
-        city: 'Kolkata',
-        state: 'West Bengal',
-        phone: '033-34567890',
-        mobile: '8765123490',
-        email: 'info@easternchemicals.com',
-        locationCoords: '22.572646,88.363895',
-      ),
     ];
   }
 
   List<Machinery> _createSampleMachineryForCustomer(int customerId) {
-    final today = DateTime.now();
+    // Using specific date of May 7, 2025 as reference point
+    final referenceDate = DateTime(2025, 5, 7);
     
     // Create 2 machinery items per customer with different installation dates and checkup intervals
     return [
@@ -136,7 +109,7 @@ class DataSeeder {
         customerId: customerId,
         name: 'Production Line ${customerId}A',
         serialNumber: 'SN-${customerId}001',
-        installationDate: DateTime(today.year - 1, today.month, today.day),
+        installationDate: DateTime(2024, 5, 7), // Exactly 1 year ago
         installationCost: 250000 + (customerId * 10000),
         checkupInterval: customerId % 2 == 0 ? 3 : 2,
       ),
@@ -144,7 +117,7 @@ class DataSeeder {
         customerId: customerId,
         name: 'Auxiliary System ${customerId}B',
         serialNumber: 'SN-${customerId}002',
-        installationDate: DateTime(today.year - 2, today.month + 2, today.day - 5),
+        installationDate: DateTime(2023, 7, 2), // About 2 years ago
         installationCost: 120000 + (customerId * 5000),
         checkupInterval: customerId % 2 == 0 ? 6 : 3,
       ),
@@ -152,19 +125,20 @@ class DataSeeder {
   }
 
   List<Maintenance> _createSampleMaintenanceForMachinery(int machineryId) {
-    final today = DateTime.now();
+    // Using specific date of May 7, 2025 as reference point
+    final referenceDate = DateTime(2025, 5, 7);
     
     // Create several maintenance records for each machinery with different statuses
     return [
-      // Completed maintenance (in the past)
+      // Completed maintenance (in the past - March 2025)
       Maintenance(
         machineryId: machineryId,
-        dueDate: DateTime(today.year, today.month - 2, today.day),
+        dueDate: DateTime(2025, 3, 7),
         nextMaintenanceDate: null,
         maintenanceType: 'Regular',
         status: MaintenanceStatus.completed,
         notes: 'Routine maintenance check completed on schedule.',
-        completedDate: DateTime(today.year, today.month - 2, today.day + 1),
+        completedDate: DateTime(2025, 3, 8),
         issue: machineryId % 3 == 0 ? 'Minor calibration issues detected' : null,
         fix: machineryId % 3 == 0 ? 'Recalibrated and tested' : 'No issues found, regular maintenance performed',
         cost: machineryId % 3 == 0 ? 2500.0 : 1200.0,
@@ -173,7 +147,7 @@ class DataSeeder {
       // Current/upcoming maintenance (due today or in near future)
       Maintenance(
         machineryId: machineryId,
-        dueDate: DateTime(today.year, today.month, today.day + (machineryId % 5)),
+        dueDate: DateTime(2025, 5, 7 + (machineryId % 5)), // Today or next few days
         nextMaintenanceDate: null,
         maintenanceType: machineryId % 2 == 0 ? 'Regular' : 'Inspection',
         status: MaintenanceStatus.upcoming,
@@ -184,17 +158,17 @@ class DataSeeder {
       if (machineryId % 2 != 0)
         Maintenance(
           machineryId: machineryId,
-          dueDate: DateTime(today.year, today.month, today.day - 10),
+          dueDate: DateTime(2025, 4, 27), // About 10 days overdue
           nextMaintenanceDate: null,
           maintenanceType: 'Emergency',
           status: MaintenanceStatus.overdue,
           notes: 'Urgent maintenance required based on performance metrics.',
         ),
       
-      // Future scheduled maintenance
+      // Future scheduled maintenance (July 2025)
       Maintenance(
         machineryId: machineryId,
-        dueDate: DateTime(today.year, today.month + 2, today.day),
+        dueDate: DateTime(2025, 7, 7),
         nextMaintenanceDate: null,
         maintenanceType: machineryId % 3 == 0 ? 'Upgrade' : 'Regular',
         status: MaintenanceStatus.upcoming,
